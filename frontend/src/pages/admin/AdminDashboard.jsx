@@ -9,6 +9,8 @@ import {
   RefreshCw,
   Inbox,
   ChevronDown,
+  Search,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSeo } from "@/lib/seo";
@@ -186,6 +188,7 @@ export default function AdminDashboard() {
   const [leads, setLeads] = useState([]);
   const [stats, setStats] = useState(null);
   const [filter, setFilter] = useState("todos");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -226,6 +229,48 @@ export default function AdminDashboard() {
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail));
     }
+  };
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? leads.filter((l) =>
+        [l.name, l.email, l.company, l.phone]
+          .filter(Boolean)
+          .some((v) => v.toLowerCase().includes(q))
+      )
+    : leads;
+
+  const exportCsv = () => {
+    if (!filtered.length) {
+      toast.error("Nada para exportar.");
+      return;
+    }
+    const headers = [
+      "Nome", "E-mail", "Empresa", "Telefone", "Interesse",
+      "Status", "Nota", "Data", "Mensagem",
+    ];
+    const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const lines = [headers.join(",")];
+    filtered.forEach((l) => {
+      lines.push(
+        [
+          l.name, l.email, l.company, l.phone, l.interest,
+          STATUS[l.status]?.label || l.status, l.note,
+          fmtDate(l.created_at), l.message,
+        ]
+          .map(esc)
+          .join(",")
+      );
+    });
+    const csv = "\ufeff" + lines.join("\r\n"); // BOM p/ acentos no Excel
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `leads-nsv-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${filtered.length} lead(s) exportado(s).`);
   };
 
   return (
@@ -283,25 +328,57 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        <div className="mt-10">
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ivory-muted" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por nome, e-mail, empresa..."
+              data-testid="admin-search"
+              className="w-full rounded-[4px] border border-white/10 bg-graphite/40 py-3 pl-10 pr-4 font-sans text-sm text-ivory placeholder:text-ivory-muted/60 focus:border-champagne focus:outline-none focus:ring-1 focus:ring-champagne"
+            />
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="font-sans text-xs text-ivory-muted">
+              {filtered.length} resultado(s)
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Download}
+              onClick={exportCsv}
+              data-testid="admin-export-csv"
+            >
+              Exportar CSV
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-6">
           {loading ? (
             <div className="flex items-center justify-center py-24">
               <Loader2 className="h-7 w-7 animate-spin text-champagne" />
             </div>
-          ) : leads.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div
               className="flex flex-col items-center justify-center rounded-[6px] border border-dashed border-white/[0.1] py-24 text-center"
               data-testid="admin-empty"
             >
               <Inbox className="h-10 w-10 text-ivory-muted" />
-              <p className="mt-4 font-serif text-xl text-ivory">Nenhum lead por aqui</p>
+              <p className="mt-4 font-serif text-xl text-ivory">
+                {q ? "Nenhum resultado para a busca" : "Nenhum lead por aqui"}
+              </p>
               <p className="mt-2 font-sans text-sm text-ivory-muted">
-                Os leads enviados pelo formulário do site aparecem aqui.
+                {q
+                  ? "Tente outro termo de busca."
+                  : "Os leads enviados pelo formulário do site aparecem aqui."}
               </p>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {leads.map((lead) => (
+              {filtered.map((lead) => (
                 <LeadCard key={lead.id} lead={lead} onStatus={onStatus} onDelete={onDelete} />
               ))}
             </div>
