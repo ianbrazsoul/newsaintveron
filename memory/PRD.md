@@ -42,6 +42,15 @@ hero cinético com masked reveal, parallax sutil, marquee editorial, framer-moti
 - [x] Seções cases/depoimentos/resultados desativadas por FEATURE_FLAGS (regra "sem invenções").
 - [x] Segurança: endpoint de leads protegido por ADMIN_API_TOKEN; segredos em env.
 
+## Painel de Leads (adicionado)
+- [x] Auth JWT (Bearer): `POST /api/auth/login`, `GET /api/auth/me`; bcrypt + brute-force 5/15min.
+- [x] Admin único semeado por env (`ADMIN_EMAIL`/`ADMIN_PASSWORD`), idempotente no startup.
+- [x] CRUD de triagem: `GET /api/leads` (+filtro), `GET /api/leads/stats`, `PATCH /api/leads/{id}`
+      (status novo/em_contato/qualificado/descartado + nota), `DELETE /api/leads/{id}`.
+- [x] Frontend `/admin/login` + `/admin` (dashboard com stats, filtros, detalhe, mudança de status,
+      nota interna, exclusão). Verificado ponta a ponta pelo navegador (login → stats → leads → PATCH → filtro, todos 200).
+- Nota: o token gate anterior (ADMIN_API_TOKEN) foi substituído por JWT.
+
 ## Backlog priorizado
 ### P0 (antes do launch — dependências externas do cliente)
 - Configurar SendGrid (API key + sender verificado) para ativar e-mail de leads. **Hoje: DESLIGADO.**

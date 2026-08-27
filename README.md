@@ -70,7 +70,9 @@ backend/
 | `SENDGRID_API_KEY` | Chave da API SendGrid — **vazia por padrão** (e-mail desligado) |
 | `SENDER_EMAIL` | Remetente verificado no SendGrid |
 | `LEAD_NOTIFICATION_EMAIL` | Destinatário das notificações de lead |
-| `ADMIN_API_TOKEN` | Token para consultar `GET /api/leads` |
+| `JWT_SECRET` | Segredo para assinar os tokens JWT do painel admin |
+| `ADMIN_EMAIL` | E-mail do admin único (semeado no startup) |
+| `ADMIN_PASSWORD` | Senha do admin (hash bcrypt gerado no startup) |
 
 ### frontend/.env
 | Variável | Descrição |
@@ -84,10 +86,18 @@ backend/
 
 ## API
 
+### Público
 - `POST /api/leads` — cria lead. Corpo: `name, email, message` (obrigatórios), `company, phone,
   interest, consent` (opcionais), `website` (honeypot — deve ficar vazio). Rate limit: 5/10min por IP.
 - `GET /api/health` — status + `email_enabled`.
-- `GET /api/leads` — lista leads. Exige header `X-Admin-Token: <ADMIN_API_TOKEN>`.
+
+### Painel de Leads (JWT — Bearer token)
+- `POST /api/auth/login` → `{ token, user }` (bcrypt + JWT HS256; brute-force: 5 tentativas / 15 min).
+- `GET /api/auth/me` → dados do admin.
+- `GET /api/leads` (filtro `?status=`), `GET /api/leads/stats`, `PATCH /api/leads/{id}` (`status`/`note`),
+  `DELETE /api/leads/{id}` — todos exigem `Authorization: Bearer <token>`.
+- Rotas do painel no frontend: `/admin/login` e `/admin` (fora do layout público).
+- Admin único semeado por env (`ADMIN_EMAIL` / `ADMIN_PASSWORD`). Credenciais em `/app/memory/test_credentials.md`.
 
 ---
 
@@ -106,7 +116,7 @@ backend/
 
 **Técnico:**
 - [ ] Revisar `CORS_ORIGINS` para o domínio de produção.
-- [ ] Rotacionar `ADMIN_API_TOKEN`.
+- [ ] Rotacionar `JWT_SECRET` e trocar `ADMIN_PASSWORD` para produção.
 - [ ] Atualizar URLs absolutas (`newsaintveron.com`) em `sitemap.xml`, `robots.txt`, JSON-LD e `REACT_APP_SITE_URL`.
 
 ---
