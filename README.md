@@ -104,7 +104,7 @@ backend/
 ## ✅ Checklist de Lançamento
 
 **Pendências do cliente (antes do go-live):**
-- [ ] **WhatsApp:** definir `REACT_APP_WHATSAPP_NUMBER` (formato `+55 DDD 9XXXX-XXXX`, só dígitos no env).
+- [x] **WhatsApp:** número definido (`5548996724536` = +55 48 99672-4536); CTA ativo em todo o site.
 - [ ] **SendGrid:** criar API Key (Full Access) + verificar remetente; preencher `SENDGRID_API_KEY`
       e `SENDER_EMAIL`. Autenticar o domínio (SPF/DKIM/DMARC) para boa entregabilidade.
 - [ ] **Domínio:** comprar domínio oficial e apontar DNS.

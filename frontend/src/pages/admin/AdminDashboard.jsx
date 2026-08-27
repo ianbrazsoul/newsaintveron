@@ -59,7 +59,7 @@ const StatCard = ({ label, value, active, onClick, testid }) => (
   </button>
 );
 
-const LeadCard = ({ lead, onStatus, onDelete }) => {
+const LeadCard = ({ lead, onStatus, onDelete, unread, onOpen }) => {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState(lead.note || "");
   const [saving, setSaving] = useState(false);
@@ -71,22 +71,48 @@ const LeadCard = ({ lead, onStatus, onDelete }) => {
     setSaving(false);
   };
 
+  const toggle = () => {
+    setOpen((v) => {
+      if (!v && unread) onOpen?.(lead.id);
+      return !v;
+    });
+  };
+
   return (
     <div
-      className="rounded-[4px] border border-white/[0.07] bg-graphite/40 transition-colors hover:border-white/15"
+      className={cn(
+        "rounded-[4px] border bg-graphite/40 transition-colors",
+        unread
+          ? "border-champagne/40 bg-champagne/[0.03] hover:border-champagne/60"
+          : "border-white/[0.07] hover:border-white/15"
+      )}
       data-testid={`lead-card-${lead.id}`}
     >
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className="flex w-full items-center justify-between gap-4 p-5 text-left"
         data-testid={`lead-toggle-${lead.id}`}
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="font-serif text-xl text-ivory">{lead.name}</span>
+            {unread && (
+              <span
+                className="h-2 w-2 shrink-0 rounded-full bg-champagne"
+                aria-label="Não lido"
+                data-testid={`lead-unread-dot-${lead.id}`}
+              />
+            )}
+            <span className={cn("font-serif text-xl", unread ? "text-ivory" : "text-ivory/90")}>
+              {lead.name}
+            </span>
             <span className={cn("rounded-full border px-2.5 py-0.5 font-sans text-[11px]", st.chip)}>
               {st.label}
             </span>
+            {unread && (
+              <span className="rounded-full bg-champagne px-2 py-0.5 font-sans text-[10px] font-semibold uppercase tracking-wide text-obsidian">
+                Não lido
+              </span>
+            )}
             {lead.interest && (
               <span className="font-sans text-xs text-ivory-muted">· {lead.interest}</span>
             )}
@@ -189,7 +215,29 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [filter, setFilter] = useState("todos");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("recentes");
+  const [readIds, setReadIds] = useState(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem("nsv_read_leads") || "[]"));
+    } catch {
+      return new Set();
+    }
+  });
   const [loading, setLoading] = useState(true);
+
+  const markRead = useCallback((id) => {
+    setReadIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem("nsv_read_leads", JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -232,13 +280,26 @@ export default function AdminDashboard() {
   };
 
   const q = search.trim().toLowerCase();
-  const filtered = q
+  const searched = q
     ? leads.filter((l) =>
         [l.name, l.email, l.company, l.phone]
           .filter(Boolean)
           .some((v) => v.toLowerCase().includes(q))
       )
     : leads;
+
+  const STATUS_ORDER = { novo: 0, em_contato: 1, qualificado: 2, descartado: 3 };
+  const filtered = [...searched].sort((a, b) => {
+    if (sort === "antigos") return new Date(a.created_at) - new Date(b.created_at);
+    if (sort === "status")
+      return (
+        (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) ||
+        new Date(b.created_at) - new Date(a.created_at)
+      );
+    return new Date(b.created_at) - new Date(a.created_at); // recentes
+  });
+
+  const unreadCount = filtered.filter((l) => !readIds.has(l.id)).length;
 
   const exportCsv = () => {
     if (!filtered.length) {
@@ -341,8 +402,24 @@ export default function AdminDashboard() {
             />
           </div>
           <div className="flex items-center gap-3">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              data-testid="admin-sort"
+              className="rounded-[4px] border border-white/10 bg-graphite/40 px-3 py-3 font-sans text-sm text-ivory focus:border-champagne focus:outline-none focus:ring-1 focus:ring-champagne"
+              aria-label="Ordenar leads"
+            >
+              <option value="recentes" className="bg-obsidian">Mais recentes</option>
+              <option value="antigos" className="bg-obsidian">Mais antigos</option>
+              <option value="status" className="bg-obsidian">Por status</option>
+            </select>
             <span className="font-sans text-xs text-ivory-muted">
               {filtered.length} resultado(s)
+              {unreadCount > 0 && (
+                <span className="ml-1 text-champagne" data-testid="admin-unread-count">
+                  · {unreadCount} não lido(s)
+                </span>
+              )}
             </span>
             <Button
               variant="secondary"
@@ -379,7 +456,14 @@ export default function AdminDashboard() {
           ) : (
             <div className="flex flex-col gap-3">
               {filtered.map((lead) => (
-                <LeadCard key={lead.id} lead={lead} onStatus={onStatus} onDelete={onDelete} />
+                <LeadCard
+                  key={lead.id}
+                  lead={lead}
+                  onStatus={onStatus}
+                  onDelete={onDelete}
+                  unread={!readIds.has(lead.id)}
+                  onOpen={markRead}
+                />
               ))}
             </div>
           )}

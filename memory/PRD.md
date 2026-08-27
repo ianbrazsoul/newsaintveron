@@ -54,7 +54,11 @@ hero cinético com masked reveal, parallax sutil, marquee editorial, framer-moti
 ## Backlog priorizado
 ### P0 (antes do launch — dependências externas do cliente)
 - Configurar SendGrid (API key + sender verificado) para ativar e-mail de leads. **Hoje: DESLIGADO.**
-- Definir número real de WhatsApp em `REACT_APP_WHATSAPP_NUMBER`. **Hoje: placeholder.**
+- [x] Número de WhatsApp definido: `5548996724536` (+55 48 99672-4536). CTA ativo em todo o site.
+### Painel — extras entregues
+- [x] Busca por nome/e-mail/empresa/telefone; Exportar CSV (BOM UTF-8).
+- [x] Ordenação (mais recentes / mais antigos / por status).
+- [x] Destaque de leads "não lidos" (persistido em localStorage; contador de não lidos).
 ### P1
 - Criar propriedade GA4 e preencher `REACT_APP_GA4_ID` (analytics após consentimento).
 - Domínio oficial + DNS + Search Console + sitemap submit; atualizar URLs absolutas.
