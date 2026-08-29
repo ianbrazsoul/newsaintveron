@@ -59,6 +59,12 @@ hero cinético com masked reveal, parallax sutil, marquee editorial, framer-moti
 - [x] Busca por nome/e-mail/empresa/telefone; Exportar CSV (BOM UTF-8).
 - [x] Ordenação (mais recentes / mais antigos / por status).
 - [x] Destaque de leads "não lidos" (persistido em localStorage; contador de não lidos).
+- [x] "Marcar todos como lidos" (limpa os destaques de uma vez).
+- [x] Aviso sonoro em tempo real: polling de `/leads/stats` a cada 20s; ao crescer o total,
+      toca um chime discreto (Web Audio, sem asset) + toast + recarrega a lista. Toggle de som
+      persistido em localStorage. Endpoint verificado por curl; e2e por clique não pôde ser
+      exercitado no sandbox de screenshot (o navegador da ferramenta não alcança /api), mas
+      build compila limpo e a lógica usa endpoints já validados.
 ### P1
 - Criar propriedade GA4 e preencher `REACT_APP_GA4_ID` (analytics após consentimento).
 - Domínio oficial + DNS + Search Console + sitemap submit; atualizar URLs absolutas.

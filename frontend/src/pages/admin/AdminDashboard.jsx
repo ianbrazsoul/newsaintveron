@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Loader2,
   LogOut,
@@ -11,6 +11,9 @@ import {
   ChevronDown,
   Search,
   Download,
+  Volume2,
+  VolumeX,
+  CheckCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useSeo } from "@/lib/seo";
@@ -224,6 +227,11 @@ export default function AdminDashboard() {
     }
   });
   const [loading, setLoading] = useState(true);
+  const [soundOn, setSoundOn] = useState(
+    () => localStorage.getItem("nsv_sound") !== "off"
+  );
+  const lastTotalRef = useRef(null);
+  const audioCtxRef = useRef(null);
 
   const markRead = useCallback((id) => {
     setReadIds((prev) => {
@@ -239,6 +247,59 @@ export default function AdminDashboard() {
     });
   }, []);
 
+  const markAllRead = useCallback(() => {
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      leads.forEach((l) => next.add(l.id));
+      try {
+        localStorage.setItem("nsv_read_leads", JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+    toast.success("Todos marcados como lidos.");
+  }, [leads]);
+
+  // Discreet two-note chime via Web Audio (no asset needed)
+  const playChime = useCallback(() => {
+    if (!soundOn) return;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+      const now = ctx.currentTime;
+      [
+        [880, 0],
+        [1174.66, 0.13],
+      ].forEach(([freq, t]) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, now + t);
+        gain.gain.exponentialRampToValueAtTime(0.1, now + t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.32);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + t);
+        osc.stop(now + t + 0.36);
+      });
+    } catch {
+      /* ignore audio errors */
+    }
+  }, [soundOn]);
+
+  const toggleSound = useCallback(() => {
+    setSoundOn((v) => {
+      const next = !v;
+      localStorage.setItem("nsv_sound", next ? "on" : "off");
+      return next;
+    });
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -248,6 +309,7 @@ export default function AdminDashboard() {
       ]);
       setLeads(leadsRes.data);
       setStats(statsRes.data);
+      if (lastTotalRef.current === null) lastTotalRef.current = statsRes.data.total;
     } catch (e) {
       toast.error(formatApiError(e.response?.data?.detail));
     } finally {
@@ -258,6 +320,27 @@ export default function AdminDashboard() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Real-time-ish polling: alert (chime + toast) when the total grows
+  useEffect(() => {
+    const id = setInterval(async () => {
+      try {
+        const { data } = await adminApi.get("/leads/stats");
+        if (lastTotalRef.current !== null && data.total > lastTotalRef.current) {
+          const diff = data.total - lastTotalRef.current;
+          playChime();
+          toast.success(
+            diff === 1 ? "Novo lead recebido!" : `${diff} novos leads recebidos!`
+          );
+          load();
+        }
+        lastTotalRef.current = data.total;
+      } catch {
+        /* silent — keep polling */
+      }
+    }, 20000);
+    return () => clearInterval(id);
+  }, [playChime, load]);
 
   const onStatus = async (id, patch) => {
     try {
@@ -350,6 +433,20 @@ export default function AdminDashboard() {
               {user?.email}
             </span>
             <button
+              onClick={toggleSound}
+              aria-label={soundOn ? "Desativar aviso sonoro" : "Ativar aviso sonoro"}
+              title={soundOn ? "Aviso sonoro ativado" : "Aviso sonoro desativado"}
+              data-testid="admin-sound-toggle"
+              className={cn(
+                "flex h-10 w-10 items-center justify-center rounded-[4px] border transition-colors",
+                soundOn
+                  ? "border-champagne/40 text-champagne hover:border-champagne"
+                  : "border-white/10 text-ivory-muted hover:border-champagne/50 hover:text-champagne"
+              )}
+            >
+              {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
+            <button
               onClick={load}
               aria-label="Recarregar"
               data-testid="admin-refresh"
@@ -421,6 +518,15 @@ export default function AdminDashboard() {
                 </span>
               )}
             </span>
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllRead}
+                data-testid="admin-mark-all-read"
+                className="flex items-center gap-1.5 rounded-[4px] border border-white/10 px-3 py-2 font-sans text-xs text-ivory-muted transition-colors hover:border-champagne/50 hover:text-champagne"
+              >
+                <CheckCheck className="h-4 w-4" /> Marcar todos como lidos
+              </button>
+            )}
             <Button
               variant="secondary"
               size="sm"
