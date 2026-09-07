@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://newsaintveron.com/sitemap.xml
+Sitemap: https://newsaintveron.vercel.app/sitemap.xml
