@@ -32,8 +32,8 @@ from auth import (
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection. Environment variables are required for database-backed
-# routes, but the module must still boot so /api/health can diagnose config.
+# MongoDB connection. Keep startup resilient so diagnostic endpoints can boot
+# even when Vercel environment variables have not been configured yet.
 mongo_url = os.getenv('MONGO_URL')
 db_name = os.getenv('DB_NAME')
 client = AsyncIOMotorClient(mongo_url) if mongo_url else None
@@ -70,6 +70,13 @@ class BaseDocument(BaseModel):
         return data
 
 
+def _require_db():
+    if db is None:
+        logger.error("MongoDB is not configured: MONGO_URL and/or DB_NAME are missing.")
+        raise HTTPException(status_code=503, detail="Banco de dados não configurado.")
+    return db
+
+
 # ---------------------------------------------------------------------------
 # Rate limiter (in-memory, per client IP)
 # ---------------------------------------------------------------------------
@@ -96,13 +103,6 @@ def _rate_limited(ip: str) -> bool:
     return False
 
 
-def _require_db():
-    if db is None:
-        logger.error("MongoDB is not configured: MONGO_URL/DB_NAME are missing.")
-        raise HTTPException(status_code=503, detail="Banco de dados não configurado.")
-    return db
-
-
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -116,6 +116,7 @@ class LeadCreate(BaseModel):
     message: str = Field(min_length=10, max_length=4000)
     consent: bool = True
     interest: Optional[str] = Field(default=None, max_length=80)
+    # Honeypot: real users leave this empty
     website: Optional[str] = Field(default=None, max_length=200)
 
     @field_validator("name", "message")
@@ -222,6 +223,7 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
     database = _require_db()
     ip = _client_ip(request)
 
+    # Honeypot: silently accept but drop bot submissions
     if payload.website and payload.website.strip():
         logger.info("Honeypot triggered; submission dropped.")
         return LeadResponse(success=True, message="Recebido.")
@@ -269,3 +271,152 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
 async def login(payload: LoginRequest, request: Request):
     database = _require_db()
     ip = _client_ip(request)
+    email = str(payload.email).lower().strip()
+    identifier = f"{ip}:{email}"
+
+    if is_locked_out(identifier):
+        raise HTTPException(
+            status_code=429,
+            detail="Muitas tentativas. Aguarde 15 minutos e tente novamente.",
+        )
+
+    user = await database.users.find_one({"email": email})
+    if not user or not verify_password(payload.password, user.get("password_hash", "")):
+        register_failed_login(identifier)
+        logger.info("Failed admin login attempt.")
+        raise HTTPException(status_code=401, detail="Credenciais inválidas.")
+
+    clear_failed_logins(identifier)
+    user_id = str(user["_id"])
+    token = create_access_token(user_id, email)
+    logger.info("Admin login success.")
+    return LoginResponse(
+        token=token,
+        user=AuthUser(
+            id=user_id,
+            email=user["email"],
+            name=user.get("name", "Admin"),
+            role=user.get("role", "admin"),
+        ),
+    )
+
+
+@api_router.get("/auth/me", response_model=AuthUser)
+async def me(current=Depends(get_current_user)):
+    return AuthUser(
+        id=current["_id"],
+        email=current["email"],
+        name=current.get("name", "Admin"),
+        role=current.get("role", "admin"),
+    )
+
+
+@api_router.get("/leads/stats")
+async def lead_stats(current=Depends(get_current_user)):
+    database = _require_db()
+    total = await database.leads.count_documents({})
+    stats = {"total": total}
+    for s in LEAD_STATUSES:
+        stats[s] = await database.leads.count_documents({"status": s})
+    # legacy leads without a status count as "novo"
+    missing = await database.leads.count_documents({"status": {"$exists": False}})
+    stats["novo"] += missing
+    return stats
+
+
+@api_router.get("/leads", response_model=List[Lead], response_model_by_alias=False)
+async def list_leads(current=Depends(get_current_user), status: Optional[str] = None):
+    database = _require_db()
+    query = {}
+    if status and status in LEAD_STATUSES:
+        query = {"status": status} if status != "novo" else {
+            "$or": [{"status": "novo"}, {"status": {"$exists": False}}]
+        }
+    docs = await database.leads.find(query).sort("created_at", -1).to_list(1000)
+    return [Lead.from_mongo(d) for d in docs]
+
+
+@api_router.patch("/leads/{lead_id}", response_model=Lead, response_model_by_alias=False)
+async def update_lead(lead_id: str, payload: LeadStatusUpdate, current=Depends(get_current_user)):
+    database = _require_db()
+    try:
+        oid = ObjectId(lead_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID inválido.")
+
+    updates = {}
+    if payload.status is not None:
+        updates["status"] = payload.status
+    if payload.note is not None:
+        updates["note"] = payload.note.strip()
+    if not updates:
+        raise HTTPException(status_code=400, detail="Nada para atualizar.")
+
+    result = await database.leads.find_one_and_update(
+        {"_id": oid}, {"$set": updates}, return_document=ReturnDocument.AFTER
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Lead não encontrado.")
+    return Lead.from_mongo(result)
+
+
+@api_router.delete("/leads/{lead_id}")
+async def delete_lead(lead_id: str, current=Depends(get_current_user)):
+    database = _require_db()
+    try:
+        oid = ObjectId(lead_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID inválido.")
+    result = await database.leads.delete_one({"_id": oid})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Lead não encontrado.")
+    return {"success": True}
+
+
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+async def on_startup():
+    if db is None:
+        logger.warning("MongoDB is not configured; skipping database startup tasks.")
+        return
+    # Indexes
+    try:
+        await db.users.create_index("email", unique=True)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Index creation skipped: %s", type(exc).__name__)
+    # Seed single admin from env (idempotent)
+    admin_email = os.environ.get("ADMIN_EMAIL", "").lower().strip()
+    admin_password = os.environ.get("ADMIN_PASSWORD", "")
+    if admin_email and admin_password:
+        existing = await db.users.find_one({"email": admin_email})
+        if existing is None:
+            await db.users.insert_one({
+                "email": admin_email,
+                "password_hash": hash_password(admin_password),
+                "name": "Admin",
+                "role": "admin",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+            logger.info("Admin user seeded.")
+        elif not verify_password(admin_password, existing.get("password_hash", "")):
+            await db.users.update_one(
+                {"email": admin_email},
+                {"$set": {"password_hash": hash_password(admin_password)}},
+            )
+            logger.info("Admin password updated from env.")
+
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    if client is not None:
+        client.close()
