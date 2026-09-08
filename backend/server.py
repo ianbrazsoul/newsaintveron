@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+import asyncio
 import os
 import re
 import time
@@ -219,9 +220,22 @@ async def root():
 
 @api_router.get("/health")
 async def health():
+    database_reachable = False
+    database_error = None
+
+    if db is not None and client is not None:
+        try:
+            await asyncio.wait_for(client.admin.command("ping"), timeout=8)
+            database_reachable = True
+        except Exception as exc:  # noqa: BLE001
+            database_error = type(exc).__name__
+            logger.warning("MongoDB health check failed: %s", database_error)
+
     return {
         "status": "healthy",
         "database_configured": db is not None,
+        "database_reachable": database_reachable,
+        "database_error": database_error,
         "email_enabled": is_email_enabled(),
         "time": datetime.now(timezone.utc).isoformat(),
     }
