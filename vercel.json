@@ -12,13 +12,6 @@
   },
   "rewrites": [
     {"source":"/api/(.*)","destination":{"service":"backend"}},
-    {"source":"/servicos","destination":{"service":"frontend","path":"/servicos.html"}},
-    {"source":"/digital-experience","destination":{"service":"frontend","path":"/digital-experience.html"}},
-    {"source":"/inteligencia-artificial","destination":{"service":"frontend","path":"/inteligencia-artificial.html"}},
-    {"source":"/contato","destination":{"service":"frontend","path":"/contato.html"}},
-    {"source":"/politica-de-privacidade","destination":{"service":"frontend","path":"/politica-de-privacidade.html"}},
-    {"source":"/politica-de-cookies","destination":{"service":"frontend","path":"/politica-de-cookies.html"}},
-    {"source":"/termos-de-uso","destination":{"service":"frontend","path":"/termos-de-uso.html"}},
     {"source":"/(.*)","destination":{"service":"frontend"}}
   ]
 }
