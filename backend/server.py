@@ -39,7 +39,16 @@ db_name = os.getenv('DB_NAME')
 client = AsyncIOMotorClient(mongo_url) if mongo_url else None
 db = client[db_name] if client and db_name else None
 
-app = FastAPI(title="NEW SAINT VÉRON API")
+IS_PRODUCTION = os.getenv("VERCEL_ENV") == "production"
+
+# Keep API documentation available during local/preview development, but do not
+# expose the interactive Swagger/ReDoc surfaces in production.
+app = FastAPI(
+    title="NEW SAINT VÉRON API",
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
+)
 api_router = APIRouter(prefix="/api")
 
 logging.basicConfig(
@@ -375,13 +384,39 @@ async def delete_lead(lead_id: str, current=Depends(get_current_user)):
 
 app.include_router(api_router)
 
+# Explicit CORS origins for production. CORS_ORIGINS can override this with a
+# comma-separated allowlist when a custom domain is introduced.
+def _cors_origins() -> list[str]:
+    configured = os.getenv("CORS_ORIGINS", "").strip()
+    if configured:
+        return [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
+    return [
+        "https://newsaintveron.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ]
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins(),
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    max_age=600,
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if IS_PRODUCTION:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 
 @app.on_event("startup")
