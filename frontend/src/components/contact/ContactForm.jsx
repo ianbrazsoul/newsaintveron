@@ -6,7 +6,7 @@ import { Button } from "@/components/common/Button";
 import { CONTACT } from "@/data/content";
 import { cn } from "@/lib/utils";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${process.env.REACT_APP_BACKEND_URL || window.location.origin}/api`;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
