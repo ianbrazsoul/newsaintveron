@@ -8,7 +8,6 @@ function setMeta(attr, key, content) {
   let el = document.head.querySelector(`meta[${attr}="${key}"]`);
   if (!el) {
     el = document.createElement("meta");
-    el.setAttribute("meta", "");
     el.setAttribute(attr, key);
     document.head.appendChild(el);
   }
