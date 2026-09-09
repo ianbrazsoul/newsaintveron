@@ -225,22 +225,65 @@ async def health():
     database_error = None
     dns_resolved = False
     dns_error = None
+    dns_error_detail = None
+    general_dns_resolved = False
+    general_dns_error = None
+    general_dns_error_detail = None
+    cluster_dns_resolved = False
+    cluster_dns_error = None
+    cluster_dns_error_detail = None
+    host_dns_checks = {}
     tcp_reachable = False
     tcp_error = None
     resolved_hosts = []
+
+    # First determine whether DNS itself works inside the Vercel runtime.
+    try:
+        resolved = await asyncio.to_thread(socket.getaddrinfo, "example.com", 443, type=socket.SOCK_STREAM)
+        general_dns_resolved = bool(resolved)
+    except Exception as exc:  # noqa: BLE001
+        general_dns_error = type(exc).__name__
+        general_dns_error_detail = str(exc)
 
     mongo_host = "cluster0.pyefmcn.mongodb.net"
     try:
         resolved = await asyncio.to_thread(socket.getaddrinfo, mongo_host, 27017, type=socket.SOCK_STREAM)
         resolved_hosts = sorted({item[4][0] for item in resolved})
         dns_resolved = bool(resolved_hosts)
+        cluster_dns_resolved = dns_resolved
     except Exception as exc:  # noqa: BLE001
         dns_error = type(exc).__name__
+        dns_error_detail = str(exc)
+        cluster_dns_error = type(exc).__name__
+        cluster_dns_error_detail = str(exc)
+
+    # Check the direct Atlas node hostnames independently. This distinguishes
+    # a cluster-alias problem from a broader Atlas DNS resolution problem.
+    atlas_hosts = [
+        "ac-q1oicmj-shard-00-00.pyefmcn.mongodb.net",
+        "ac-q1oicmj-shard-00-01.pyefmcn.mongodb.net",
+        "ac-q1oicmj-shard-00-02.pyefmcn.mongodb.net",
+    ]
+    for host in atlas_hosts:
+        try:
+            resolved = await asyncio.to_thread(socket.getaddrinfo, host, 27017, type=socket.SOCK_STREAM)
+            ips = sorted({item[4][0] for item in resolved})
+            host_dns_checks[host] = {"resolved": bool(ips), "ips": ips}
+        except Exception as exc:  # noqa: BLE001
+            host_dns_checks[host] = {
+                "resolved": False,
+                "error": type(exc).__name__,
+                "error_detail": str(exc),
+            }
 
     if dns_resolved:
         for host in resolved_hosts[:3]:
             try:
-                await asyncio.wait_for(asyncio.to_thread(socket.create_connection, (host, 27017), 3), timeout=4)
+                connection = await asyncio.wait_for(
+                    asyncio.to_thread(socket.create_connection, (host, 27017,)),
+                    timeout=4,
+                )
+                connection.close()
                 tcp_reachable = True
                 break
             except Exception as exc:  # noqa: BLE001
@@ -259,6 +302,14 @@ async def health():
         "database_configured": db is not None,
         "dns_resolved": dns_resolved,
         "dns_error": dns_error,
+        "dns_error_detail": dns_error_detail,
+        "general_dns_resolved": general_dns_resolved,
+        "general_dns_error": general_dns_error,
+        "general_dns_error_detail": general_dns_error_detail,
+        "cluster_dns_resolved": cluster_dns_resolved,
+        "cluster_dns_error": cluster_dns_error,
+        "cluster_dns_error_detail": cluster_dns_error_detail,
+        "host_dns_checks": host_dns_checks,
         "resolved_hosts": resolved_hosts,
         "tcp_reachable": tcp_reachable,
         "tcp_error": tcp_error,
