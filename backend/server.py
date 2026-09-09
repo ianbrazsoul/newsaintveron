@@ -248,6 +248,25 @@ async def health():
     atlas_ipv6_error_detail = None
     atlas_ipv6_hosts = []
 
+    # Test the DNS library used by PyMongo for mongodb+srv discovery. This is
+    # diagnostic only; it does not change the Mongo client configuration.
+    mongo_uri_scheme = None
+    srv_resolved = False
+    srv_error = None
+    srv_error_detail = None
+    srv_records = []
+    txt_resolved = False
+    txt_error = None
+    txt_error_detail = None
+    txt_records = []
+    dnspython_available = False
+
+    try:
+        from urllib.parse import urlsplit
+        mongo_uri_scheme = urlsplit(mongo_url).scheme if mongo_url else None
+    except Exception:
+        mongo_uri_scheme = None
+
     # First determine whether DNS itself works inside the Vercel runtime.
     try:
         resolved = await asyncio.to_thread(socket.getaddrinfo, "example.com", 443, type=socket.SOCK_STREAM)
@@ -298,6 +317,40 @@ async def health():
         atlas_ipv6_error = type(exc).__name__
         atlas_ipv6_error_detail = str(exc)
 
+    # Check direct SRV/TXT records through dnspython, which is the resolver
+    # path used by PyMongo for mongodb+srv URIs.
+    try:
+        import dns.resolver
+        dnspython_available = True
+
+        def _resolve_dns_records():
+            resolver = dns.resolver.Resolver(configure=True)
+            srv = resolver.resolve(f"_mongodb._tcp.{mongo_host}", "SRV", lifetime=4)
+            txt = resolver.resolve(mongo_host, "TXT", lifetime=4)
+            return (
+                sorted(str(answer).rstrip(".") for answer in srv),
+                sorted(" ".join(str(part) for part in answer.strings) for answer in txt),
+            )
+
+        srv_records, txt_records = await asyncio.to_thread(_resolve_dns_records)
+        srv_resolved = bool(srv_records)
+        txt_resolved = bool(txt_records)
+    except Exception as exc:  # noqa: BLE001
+        # Keep failures separated so we can tell whether SRV or TXT is the
+        # first record type blocked by the runtime.
+        error_name = type(exc).__name__
+        error_detail = str(exc)
+        if not dnspython_available:
+            srv_error = error_name
+            srv_error_detail = error_detail
+            txt_error = error_name
+            txt_error_detail = error_detail
+        else:
+            srv_error = error_name
+            srv_error_detail = error_detail
+            txt_error = error_name
+            txt_error_detail = error_detail
+
     # Check the direct Atlas node hostnames independently. This distinguishes
     # a cluster-alias problem from a broader Atlas DNS resolution problem.
     atlas_hosts = [
@@ -341,6 +394,7 @@ async def health():
     return {
         "status": "healthy",
         "database_configured": db is not None,
+        "mongo_uri_scheme": mongo_uri_scheme,
         "dns_resolved": dns_resolved,
         "dns_error": dns_error,
         "dns_error_detail": dns_error_detail,
@@ -358,6 +412,15 @@ async def health():
         "atlas_ipv6_error": atlas_ipv6_error,
         "atlas_ipv6_error_detail": atlas_ipv6_error_detail,
         "atlas_ipv6_hosts": atlas_ipv6_hosts,
+        "dnspython_available": dnspython_available,
+        "srv_resolved": srv_resolved,
+        "srv_error": srv_error,
+        "srv_error_detail": srv_error_detail,
+        "srv_records": srv_records,
+        "txt_resolved": txt_resolved,
+        "txt_error": txt_error,
+        "txt_error_detail": txt_error_detail,
+        "txt_records": txt_records,
         "host_dns_checks": host_dns_checks,
         "resolved_hosts": resolved_hosts,
         "tcp_reachable": tcp_reachable,
