@@ -8,6 +8,7 @@ import os
 import re
 import time
 import logging
+import socket
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator
 from pydantic.functional_validators import BeforeValidator
@@ -222,6 +223,28 @@ async def root():
 async def health():
     database_reachable = False
     database_error = None
+    dns_resolved = False
+    dns_error = None
+    tcp_reachable = False
+    tcp_error = None
+    resolved_hosts = []
+
+    mongo_host = "cluster0.pyefmcn.mongodb.net"
+    try:
+        resolved = await asyncio.to_thread(socket.getaddrinfo, mongo_host, 27017, type=socket.SOCK_STREAM)
+        resolved_hosts = sorted({item[4][0] for item in resolved})
+        dns_resolved = bool(resolved_hosts)
+    except Exception as exc:  # noqa: BLE001
+        dns_error = type(exc).__name__
+
+    if dns_resolved:
+        for host in resolved_hosts[:3]:
+            try:
+                await asyncio.wait_for(asyncio.to_thread(socket.create_connection, (host, 27017), 3), timeout=4)
+                tcp_reachable = True
+                break
+            except Exception as exc:  # noqa: BLE001
+                tcp_error = type(exc).__name__
 
     if db is not None and client is not None:
         try:
@@ -234,6 +257,11 @@ async def health():
     return {
         "status": "healthy",
         "database_configured": db is not None,
+        "dns_resolved": dns_resolved,
+        "dns_error": dns_error,
+        "resolved_hosts": resolved_hosts,
+        "tcp_reachable": tcp_reachable,
+        "tcp_error": tcp_error,
         "database_reachable": database_reachable,
         "database_error": database_error,
         "email_enabled": is_email_enabled(),
@@ -317,7 +345,7 @@ async def login(payload: LoginRequest, request: Request):
         token=token,
         user=AuthUser(
             id=user_id,
-            email=user["email"],
+            email=email,
             name=user.get("name", "Admin"),
             role=user.get("role", "admin"),
         ),
