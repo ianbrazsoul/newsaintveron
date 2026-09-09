@@ -237,6 +237,17 @@ async def health():
     tcp_error = None
     resolved_hosts = []
 
+    # Explicit family checks determine whether the runtime problem is specific
+    # to the default getaddrinfo path or affects IPv4/IPv6 independently.
+    atlas_ipv4_resolved = False
+    atlas_ipv4_error = None
+    atlas_ipv4_error_detail = None
+    atlas_ipv4_hosts = []
+    atlas_ipv6_resolved = False
+    atlas_ipv6_error = None
+    atlas_ipv6_error_detail = None
+    atlas_ipv6_hosts = []
+
     # First determine whether DNS itself works inside the Vercel runtime.
     try:
         resolved = await asyncio.to_thread(socket.getaddrinfo, "example.com", 443, type=socket.SOCK_STREAM)
@@ -256,6 +267,36 @@ async def health():
         dns_error_detail = str(exc)
         cluster_dns_error = type(exc).__name__
         cluster_dns_error_detail = str(exc)
+
+    # Force IPv4 and IPv6 separately. This is diagnostic only and does not
+    # alter the Mongo client configuration.
+    try:
+        resolved = await asyncio.to_thread(
+            socket.getaddrinfo,
+            mongo_host,
+            27017,
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+        )
+        atlas_ipv4_hosts = sorted({item[4][0] for item in resolved})
+        atlas_ipv4_resolved = bool(atlas_ipv4_hosts)
+    except Exception as exc:  # noqa: BLE001
+        atlas_ipv4_error = type(exc).__name__
+        atlas_ipv4_error_detail = str(exc)
+
+    try:
+        resolved = await asyncio.to_thread(
+            socket.getaddrinfo,
+            mongo_host,
+            27017,
+            socket.AF_INET6,
+            socket.SOCK_STREAM,
+        )
+        atlas_ipv6_hosts = sorted({item[4][0] for item in resolved})
+        atlas_ipv6_resolved = bool(atlas_ipv6_hosts)
+    except Exception as exc:  # noqa: BLE001
+        atlas_ipv6_error = type(exc).__name__
+        atlas_ipv6_error_detail = str(exc)
 
     # Check the direct Atlas node hostnames independently. This distinguishes
     # a cluster-alias problem from a broader Atlas DNS resolution problem.
@@ -309,6 +350,14 @@ async def health():
         "cluster_dns_resolved": cluster_dns_resolved,
         "cluster_dns_error": cluster_dns_error,
         "cluster_dns_error_detail": cluster_dns_error_detail,
+        "atlas_ipv4_resolved": atlas_ipv4_resolved,
+        "atlas_ipv4_error": atlas_ipv4_error,
+        "atlas_ipv4_error_detail": atlas_ipv4_error_detail,
+        "atlas_ipv4_hosts": atlas_ipv4_hosts,
+        "atlas_ipv6_resolved": atlas_ipv6_resolved,
+        "atlas_ipv6_error": atlas_ipv6_error,
+        "atlas_ipv6_error_detail": atlas_ipv6_error_detail,
+        "atlas_ipv6_hosts": atlas_ipv6_hosts,
         "host_dns_checks": host_dns_checks,
         "resolved_hosts": resolved_hosts,
         "tcp_reachable": tcp_reachable,
