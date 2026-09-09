@@ -34,11 +34,50 @@ from auth import (
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection. Keep startup resilient so diagnostic endpoints can boot
-# even when Vercel environment variables have not been configured yet.
+# MongoDB connection. Atlas provides an SRV connection string for discovery.
+# If the existing production variable is a standard mongodb:// URI pointing at
+# this Atlas cluster, transparently switch only the connection mechanism to the
+# equivalent mongodb+srv:// form. Credentials and the configured database stay
+# in the environment variable and are never logged or exposed.
 mongo_url = os.getenv('MONGO_URL')
 db_name = os.getenv('DB_NAME')
-client = AsyncIOMotorClient(mongo_url) if mongo_url else None
+
+
+def _mongo_connection_uri(uri: Optional[str]) -> tuple[Optional[str], bool]:
+    if not uri:
+        return None, False
+    try:
+        from urllib.parse import urlsplit
+        parts = urlsplit(uri)
+        if parts.scheme != "mongodb":
+            return uri, False
+
+        # Only apply the fallback to this Atlas cluster. Other MongoDB
+        # deployments must keep their original connection URI untouched.
+        if "pyefmcn.mongodb.net" not in parts.netloc:
+            return uri, False
+
+        userinfo = ""
+        if "@" in parts.netloc:
+            userinfo = parts.netloc.rsplit("@", 1)[0] + "@"
+
+        # Preserve database path and connection options, except replicaSet:
+        # Atlas publishes the authoritative replica set through its TXT record
+        # for SRV connections.
+        query_parts = [
+            item for item in parts.query.split("&")
+            if item and not item.lower().startswith("replicaset=")
+        ]
+        srv_uri = f"mongodb+srv://{userinfo}cluster0.pyefmcn.mongodb.net{parts.path or '/'}"
+        if query_parts:
+            srv_uri += "?" + "&".join(query_parts)
+        return srv_uri, True
+    except Exception:
+        return uri, False
+
+
+mongo_connection_uri, using_atlas_srv_fallback = _mongo_connection_uri(mongo_url)
+client = AsyncIOMotorClient(mongo_connection_uri) if mongo_connection_uri else None
 db = client[db_name] if client and db_name else None
 
 IS_PRODUCTION = os.getenv("VERCEL_ENV") == "production"
@@ -260,6 +299,8 @@ async def health():
     txt_error_detail = None
     txt_records = []
     dnspython_available = False
+    srv_host_dns_checks = {}
+    srv_host_tcp_checks = {}
 
     try:
         from urllib.parse import urlsplit
@@ -327,37 +368,57 @@ async def health():
             resolver = dns.resolver.Resolver(configure=True)
             srv = resolver.resolve(f"_mongodb._tcp.{mongo_host}", "SRV", lifetime=4)
             txt = resolver.resolve(mongo_host, "TXT", lifetime=4)
-            return (
-                sorted(str(answer).rstrip(".") for answer in srv),
-                sorted(" ".join(str(part) for part in answer.strings) for answer in txt),
-            )
+            srv_values = sorted(str(answer).rstrip(".") for answer in srv)
+            txt_values = sorted(" ".join(str(part) for part in answer.strings) for answer in txt)
+            return srv_values, txt_values
 
         srv_records, txt_records = await asyncio.to_thread(_resolve_dns_records)
         srv_resolved = bool(srv_records)
         txt_resolved = bool(txt_records)
+
+        # Resolve the exact hostnames returned by Atlas SRV. This avoids the
+        # previous diagnostic typo and tells us whether dnspython can resolve
+        # the actual replica-set members used by the SRV connection.
+        for record in srv_records:
+            try:
+                parts = record.split()
+                host = parts[-1].rstrip(".")
+                resolver = dns.resolver.Resolver(configure=True)
+                a_records = resolver.resolve(host, "A", lifetime=4)
+                ips = sorted(str(answer) for answer in a_records)
+                srv_host_dns_checks[host] = {"resolved": bool(ips), "ips": ips}
+
+                tcp_results = {}
+                for ip in ips:
+                    try:
+                        connection = await asyncio.to_thread(socket.create_connection, (ip, 27017), 4)
+                        connection.close()
+                        tcp_results[ip] = True
+                    except Exception as tcp_exc:  # noqa: BLE001
+                        tcp_results[ip] = {
+                            "reachable": False,
+                            "error": type(tcp_exc).__name__,
+                        }
+                srv_host_tcp_checks[host] = tcp_results
+            except Exception as exc:  # noqa: BLE001
+                host = record.split()[-1].rstrip(".")
+                srv_host_dns_checks[host] = {
+                    "resolved": False,
+                    "error": type(exc).__name__,
+                    "error_detail": str(exc),
+                }
     except Exception as exc:  # noqa: BLE001
-        # Keep failures separated so we can tell whether SRV or TXT is the
-        # first record type blocked by the runtime.
         error_name = type(exc).__name__
         error_detail = str(exc)
-        if not dnspython_available:
-            srv_error = error_name
-            srv_error_detail = error_detail
-            txt_error = error_name
-            txt_error_detail = error_detail
-        else:
-            srv_error = error_name
-            srv_error_detail = error_detail
-            txt_error = error_name
-            txt_error_detail = error_detail
+        srv_error = error_name
+        srv_error_detail = error_detail
+        txt_error = error_name
+        txt_error_detail = error_detail
 
-    # Check the direct Atlas node hostnames independently. This distinguishes
-    # a cluster-alias problem from a broader Atlas DNS resolution problem.
-    atlas_hosts = [
-        "ac-q1oicmj-shard-00-00.pyefmcn.mongodb.net",
-        "ac-q1oicmj-shard-00-01.pyefmcn.mongodb.net",
-        "ac-q1oicmj-shard-00-02.pyefmcn.mongodb.net",
-    ]
+    # Check the direct Atlas node hostnames independently using the exact
+    # hostnames returned by SRV when available. This distinguishes a cluster
+    # alias problem from a broader Atlas DNS resolution problem.
+    atlas_hosts = [host for host in srv_host_dns_checks.keys()]
     for host in atlas_hosts:
         try:
             resolved = await asyncio.to_thread(socket.getaddrinfo, host, 27017, type=socket.SOCK_STREAM)
@@ -395,6 +456,7 @@ async def health():
         "status": "healthy",
         "database_configured": db is not None,
         "mongo_uri_scheme": mongo_uri_scheme,
+        "using_atlas_srv_fallback": using_atlas_srv_fallback,
         "dns_resolved": dns_resolved,
         "dns_error": dns_error,
         "dns_error_detail": dns_error_detail,
@@ -421,6 +483,8 @@ async def health():
         "txt_error": txt_error,
         "txt_error_detail": txt_error_detail,
         "txt_records": txt_records,
+        "srv_host_dns_checks": srv_host_dns_checks,
+        "srv_host_tcp_checks": srv_host_tcp_checks,
         "host_dns_checks": host_dns_checks,
         "resolved_hosts": resolved_hosts,
         "tcp_reachable": tcp_reachable,
@@ -489,10 +553,7 @@ async def login(payload: LoginRequest, request: Request):
     identifier = f"{ip}:{email}"
 
     if is_locked_out(identifier):
-        raise HTTPException(
-            status_code=429,
-            detail="Muitas tentativas. Aguarde 15 minutos e tente novamente.",
-        )
+        raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde 15 minutos e tente novamente.")
 
     user = await database.users.find_one({"email": email})
     if not user or not verify_password(payload.password, user.get("password_hash", "")):
