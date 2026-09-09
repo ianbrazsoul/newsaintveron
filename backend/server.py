@@ -262,6 +262,8 @@ async def root():
 async def health():
     database_reachable = False
     database_error = None
+    database_error_code = None
+    database_error_code_name = None
     dns_resolved = False
     dns_error = None
     dns_error_detail = None
@@ -450,7 +452,16 @@ async def health():
             database_reachable = True
         except Exception as exc:  # noqa: BLE001
             database_error = type(exc).__name__
-            logger.warning("MongoDB health check failed: %s", database_error)
+            database_error_code = getattr(exc, "code", None)
+            details = getattr(exc, "details", None)
+            if isinstance(details, dict):
+                database_error_code_name = details.get("codeName")
+            logger.warning(
+                "MongoDB health check failed: type=%s code=%s code_name=%s",
+                database_error,
+                database_error_code,
+                database_error_code_name,
+            )
 
     return {
         "status": "healthy",
@@ -491,6 +502,8 @@ async def health():
         "tcp_error": tcp_error,
         "database_reachable": database_reachable,
         "database_error": database_error,
+        "database_error_code": database_error_code,
+        "database_error_code_name": database_error_code_name,
         "email_enabled": is_email_enabled(),
         "time": datetime.now(timezone.utc).isoformat(),
     }
