@@ -61,12 +61,13 @@ def _mongo_connection_uri(uri: Optional[str]) -> tuple[Optional[str], bool]:
         if "@" in parts.netloc:
             userinfo = parts.netloc.rsplit("@", 1)[0] + "@"
 
-        # Preserve database path and connection options, except replicaSet:
-        # Atlas publishes the authoritative replica set through its TXT record
-        # for SRV connections.
+        # Preserve ordinary connection options, while allowing Atlas SRV/TXT
+        # discovery to provide the authoritative replica set and auth source.
         query_parts = [
             item for item in parts.query.split("&")
-            if item and not item.lower().startswith("replicaset=")
+            if item
+            and not item.lower().startswith("replicaset=")
+            and not item.lower().startswith("authsource=")
         ]
         srv_uri = f"mongodb+srv://{userinfo}cluster0.pyefmcn.mongodb.net{parts.path or '/'}"
         if query_parts:
