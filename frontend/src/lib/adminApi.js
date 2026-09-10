@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = "/api";
 const TOKEN_KEY = "nsv_admin_token";
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
