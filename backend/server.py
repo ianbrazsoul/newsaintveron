@@ -232,6 +232,7 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
     database = _require_db()
     ip = _client_ip(request)
 
+    # Honeypot: silently accept but drop bot submissions
     if payload.website and payload.website.strip():
         logger.info("Honeypot triggered; submission dropped.")
         return LeadResponse(success=True, message="Recebido.")
@@ -283,10 +284,7 @@ async def login(payload: LoginRequest, request: Request):
     identifier = f"{ip}:{email}"
 
     if is_locked_out(identifier):
-        raise HTTPException(
-            status_code=429,
-            detail="Muitas tentativas. Aguarde 15 minutos e tente novamente.",
-        )
+        raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde 15 minutos e tente novamente.")
 
     user = await database.users.find_one({"email": email})
     if not user or not verify_password(payload.password, user.get("password_hash", "")):
@@ -314,7 +312,7 @@ async def me(current=Depends(get_current_user)):
     return AuthUser(
         id=current["_id"],
         email=current["email"],
-        name=current["name"],
+        name=current.get("name", "Admin"),
         role=current.get("role", "admin"),
     )
 
@@ -326,6 +324,7 @@ async def lead_stats(current=Depends(get_current_user)):
     stats = {"total": total}
     for s in LEAD_STATUSES:
         stats[s] = await database.leads.count_documents({"status": s})
+    # legacy leads without a status count as "novo"
     missing = await database.leads.count_documents({"status": {"$exists": False}})
     stats["novo"] += missing
     return stats
@@ -382,7 +381,8 @@ async def delete_lead(lead_id: str, current=Depends(get_current_user)):
 
 app.include_router(api_router)
 
-
+# Explicit CORS origins for production. CORS_ORIGINS can override this with a
+# comma-separated allowlist when a custom domain is introduced.
 def _cors_origins() -> list[str]:
     configured = os.getenv("CORS_ORIGINS", "").strip()
     if configured:
@@ -421,10 +421,12 @@ async def on_startup():
     if db is None:
         logger.warning("MongoDB is not configured; skipping database startup tasks.")
         return
+    # Indexes
     try:
         await db.users.create_index("email", unique=True)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Index creation skipped: %s", type(exc).__name__)
+    # Seed single admin from env (idempotent)
     admin_email = os.environ.get("ADMIN_EMAIL", "").lower().strip()
     admin_password = os.environ.get("ADMIN_PASSWORD", "")
     if admin_email and admin_password:
