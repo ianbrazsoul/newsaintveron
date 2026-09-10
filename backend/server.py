@@ -284,7 +284,10 @@ async def login(payload: LoginRequest, request: Request):
     identifier = f"{ip}:{email}"
 
     if is_locked_out(identifier):
-        raise HTTPException(status_code=429, detail="Muitas tentativas. Aguarde 15 minutos e tente novamente.")
+        raise HTTPException(
+            status_code=429,
+            detail="Muitas tentativas. Aguarde 15 minutos e tente novamente.",
+        )
 
     user = await database.users.find_one({"email": email})
     if not user or not verify_password(payload.password, user.get("password_hash", "")):
