@@ -8,7 +8,7 @@ export const BRAND = {
   tagline: "Digital Experience & Artificial Intelligence",
   positioning:
     "Arquitetamos experiências digitais e sistemas de inteligência artificial para marcas que recusam o comum.",
-  email: "contato@newsaintveron.com",
+  email: "newsaintveron@gmail.com",
 };
 
 export const FEATURE_FLAGS = {
