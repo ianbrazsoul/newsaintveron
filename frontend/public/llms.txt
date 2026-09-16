@@ -1,0 +1,22 @@
+# NEW SAINT VÉRON
+
+> NEW SAINT VÉRON é uma consultoria premium de Digital Experience e Inteligência Artificial para empresas e marcas. Une estratégia, design e engenharia para criar experiências digitais, produtos, automações e sistemas inteligentes.
+
+A NEW SAINT VÉRON atua com foco em excelência, segurança, acessibilidade e performance, oferecendo soluções digitais personalizadas para empresas e marcas.
+
+## Principais páginas
+
+- [Serviços](https://newsaintveron.vercel.app/servicos): Visão geral dos serviços de Digital Experience e Inteligência Artificial.
+- [Digital Experience](https://newsaintveron.vercel.app/digital-experience): Estratégia, identidade, interface e produto digital construídos como um sistema coeso.
+- [Inteligência Artificial](https://newsaintveron.vercel.app/inteligencia-artificial): Soluções de inteligência artificial, automação e sistemas inteligentes aplicados a negócios.
+- [Contato](https://newsaintveron.vercel.app/contato): Canal de contato da NEW SAINT VÉRON para projetos e soluções digitais.
+
+## Sobre a empresa
+
+- [Página inicial](https://newsaintveron.vercel.app/): Apresentação da NEW SAINT VÉRON, seu posicionamento, metodologia e áreas de atuação.
+
+## Informações legais
+
+- [Política de Privacidade](https://newsaintveron.vercel.app/politica-de-privacidade): Política de privacidade e tratamento de dados do site.
+- [Política de Cookies](https://newsaintveron.vercel.app/politica-de-cookies): Informações sobre o uso de cookies no site.
+- [Termos de Uso](https://newsaintveron.vercel.app/termos-de-uso): Termos e condições de uso do site.
