@@ -5,9 +5,9 @@ import { Reveal } from "@/components/common/Reveal";
 import { SERVICES } from "@/data/content";
 
 const DX_IMG =
-  "https://images.unsplash.com/photo-1704354428728-24b8ccab5c3d?crop=entropy&cs=srgb&fm=jpg&q=85&w=1400";
+  "https://images.unsplash.com/photo-1704354428728-24b8ccab5c3d?crop=entropy&cs=srgb&fm=jpg&q=75&w=900";
 const AI_IMG =
-  "https://images.unsplash.com/photo-1511406361295-0a1ff814c0ce?crop=entropy&cs=srgb&fm=jpg&q=85&w=1400";
+  "https://images.unsplash.com/photo-1511406361295-0a1ff814c0ce?crop=entropy&cs=srgb&fm=jpg&q=75&w=900";
 const IMGS = { "digital-experience": DX_IMG, "artificial-intelligence": AI_IMG };
 
 export const ServicesPreview = () => (
@@ -40,6 +40,10 @@ export const ServicesPreview = () => (
               <img
                 src={IMGS[s.slug]}
                 alt={s.title}
+                loading="lazy"
+                decoding="async"
+                width="900"
+                height="600"
                 className="h-full w-full object-cover opacity-45 grayscale transition-all duration-700 group-hover:scale-105 group-hover:opacity-60 group-hover:grayscale-0"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-graphite to-transparent" />
