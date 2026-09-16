@@ -6,7 +6,7 @@ import { MaskedHeading } from "@/components/common/MaskedHeading";
 import { Button } from "@/components/common/Button";
 
 const HERO_IMG =
-  "https://images.unsplash.com/photo-1707338252277-3f66895b0532?crop=entropy&cs=srgb&fm=jpg&q=85&w=2000";
+  "https://images.unsplash.com/photo-1707338252277-3f66895b0532?crop=entropy&cs=srgb&fm=jpg&q=80&w=1600";
 
 export const Hero = () => {
   const ref = useRef(null);
@@ -33,6 +33,9 @@ export const Hero = () => {
           aria-hidden="true"
           className="h-full w-full object-cover opacity-50"
           fetchPriority="high"
+          decoding="async"
+          width="1600"
+          height="1122"
         />
       </motion.div>
       {/* Cinematic clip / spotlight overlays (solid, no muddy gradients on top of image only) */}
@@ -63,7 +66,7 @@ export const Hero = () => {
 
         <div className="mt-10 grid gap-10 md:grid-cols-12 md:items-end">
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 1, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7, duration: 0.9 }}
             className="max-w-xl font-sans text-base leading-relaxed text-ivory-muted md:col-span-7 md:text-lg"
