@@ -53,6 +53,18 @@
       }
     },
     {
+      "source": "/sitemap.xml",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/robots.txt",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
       "source": "/",
       "destination": {
         "service": "frontend"
