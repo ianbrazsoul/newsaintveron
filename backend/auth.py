@@ -1,6 +1,6 @@
 """JWT auth helpers for the NEW SAINT VÉRON admin panel.
 
-Bearer-token based (Authorization header) to keep CORS simple. Single seeded
+HttpOnly cookie-based session. Single seeded
 admin — no public registration. Secrets live in env vars only.
 """
 import os
