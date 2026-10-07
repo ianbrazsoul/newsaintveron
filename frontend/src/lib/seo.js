@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 
-// Canonical public origin until the custom .com domain is connected.
-const SITE_URL = process.env.REACT_APP_SITE_URL || "https://newsaintveron.vercel.app";
+const SITE_URL = process.env.REACT_APP_SITE_URL || "https://www.newsaintveron.com.br";
 
 function setMeta(attr, key, content) {
   if (!content) return;
