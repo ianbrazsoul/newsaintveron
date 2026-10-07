@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { PageHero } from "@/components/common/PageHero";
 import { Section, Overline } from "@/components/common/Section";
@@ -12,7 +11,6 @@ export const ServiceDetail = ({
   overline,
   heroLines,
   subtitle,
-  image,
   intro,
   capabilities,
   approach,
@@ -24,14 +22,21 @@ export const ServiceDetail = ({
     <Section className="bg-obsidian">
       <div className="grid gap-12 md:grid-cols-12 md:items-center">
         <Reveal className="md:col-span-6">
-          <div className="overflow-hidden rounded-[4px] border border-white/[0.07]">
-            <img
-              src={image}
-              alt={overline}
-              className="h-[420px] w-full object-cover opacity-55 grayscale transition-all duration-700 hover:opacity-70 hover:grayscale-0"
-            />
+          <div className="relative h-[420px] overflow-hidden rounded-[4px] border border-white/[0.07] bg-graphite">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_72%_24%,rgba(212,175,55,0.14),transparent_36%),linear-gradient(135deg,rgba(255,255,255,0.04),transparent_55%)]" />
+            <div className="absolute left-8 top-8 h-24 w-24 border-l border-t border-champagne/40" />
+            <div className="absolute bottom-8 right-8 h-24 w-24 border-b border-r border-champagne/40" />
+            <div className="absolute bottom-8 left-8">
+              <span className="block font-serif text-6xl italic text-champagne/70">
+                {index}
+              </span>
+              <span className="mt-2 block text-overline font-sans text-ivory-muted">
+                {overline}
+              </span>
+            </div>
           </div>
         </Reveal>
+
         <div className="md:col-span-5 md:col-start-8">
           <Reveal>
             <Overline>Visão</Overline>
