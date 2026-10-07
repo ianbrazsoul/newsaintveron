@@ -58,6 +58,15 @@ body {
     outline-offset: 3px;
 }
 
+/* Numerals: restrained editorial system, distinct from display typography */
+.numeric-display {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+    font-weight: 400;
+    letter-spacing: -0.035em;
+}
+
 /* Fluid display heading helpers */
 .font-serif {
     font-feature-settings: "liga" 1, "dlig" 1;
