@@ -24,7 +24,7 @@ const pages = {
 function esc(value) { return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;"); }
 
 function render(page, route) {
-  const canonical = `https://newsaintveron.vercel.app${route === "/" ? "/" : route}`;
+  const canonical = `https://www.newsaintveron.com.br${route === "/" ? "/" : route}`;
   const nav = page.links.map((link) => `<a href="${link}">${link === "/" ? "Início" : link.replace(/^\//, "").replace(/-/g, " ")}</a>`).join(" · ");
   const staticRoot = `<main><article><p>NEW SAINT VÉRON</p><h1>${esc(page.h1)}</h1><p>${esc(page.body)}</p><nav aria-label="Navegação relacionada">${nav} · <a href="https://www.instagram.com/thenewsaintveron/">Instagram da NEW SAINT VÉRON</a></nav></article></main>`;
   let html = template;
