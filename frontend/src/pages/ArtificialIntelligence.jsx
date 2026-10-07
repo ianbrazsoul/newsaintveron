@@ -1,9 +1,6 @@
 import { useSeo } from "@/lib/seo";
 import { ServiceDetail } from "@/components/services/ServiceDetail";
 
-const IMG =
-  "https://images.unsplash.com/photo-1511406361295-0a1ff814c0ce?crop=entropy&cs=srgb&fm=jpg&q=85&w=1600";
-
 export default function ArtificialIntelligence() {
   useSeo({
     title: "Inteligência Artificial",
@@ -18,7 +15,6 @@ export default function ArtificialIntelligence() {
       overline="Artificial Intelligence"
       heroLines={["Inteligência", "com propósito,", "não com hype."]}
       subtitle="Aplicamos IA a problemas reais de negócio — automação, assistentes, análise e produtos inteligentes — sempre com governança, segurança e resultado mensurável."
-      image={IMG}
       intro={[
         "Inteligência artificial só entra quando resolve um problema concreto. Nada de recursos decorativos ou promessas vagas.",
         "Integramos modelos de linguagem de última geração à sua operação e aos seus produtos, com pipelines de dados governados e práticas de segurança desde o início.",
