@@ -1,19 +1,26 @@
 import axios from "axios";
 
 const API = "/api";
-const TOKEN_KEY = "nsv_admin_token";
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY);
-export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
-export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
-
-export const adminApi = axios.create({ baseURL: API });
-
-adminApi.interceptors.request.use((config) => {
-  const t = getToken();
-  if (t) config.headers.Authorization = `Bearer ${t}`;
-  return config;
+export const adminApi = axios.create({
+  baseURL: API,
+  withCredentials: true,
 });
+
+export const getToken = () => null;
+export const setToken = () => {};
+export const clearToken = () => {};
+
+adminApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // The server owns the session now; the browser keeps the HttpOnly cookie.
+      window.dispatchEvent(new Event("nsv:auth-expired"));
+    }
+    return Promise.reject(error);
+  }
+);
 
 // FastAPI 422 returns an array of error objects — never render it raw.
 export function formatApiError(detail) {
