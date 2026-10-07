@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, Request, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, APIRouter, Request, HTTPException, BackgroundTasks, Depends, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -178,7 +178,6 @@ class AuthUser(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    token: str
     user: AuthUser
 
 
@@ -188,18 +187,18 @@ class LoginResponse(BaseModel):
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
-) -> dict:
-    if credentials is None or not credentials.credentials:
+async def get_current_user(request: Request) -> dict:
+    token = request.cookies.get("nsv_admin_session")
+    if not token:
         raise HTTPException(status_code=401, detail="Não autenticado.")
-    token = credentials.credentials
     try:
         payload = decode_access_token(token)
         database = _require_db()
         user = await database.users.find_one({"_id": ObjectId(payload["sub"])})
         if not user:
             raise HTTPException(status_code=401, detail="Usuário não encontrado.")
+        if user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Acesso administrativo não autorizado.")
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
         return user
@@ -277,7 +276,7 @@ async def create_lead(payload: LeadCreate, request: Request, background_tasks: B
 
 
 @api_router.post("/auth/login", response_model=LoginResponse)
-async def login(payload: LoginRequest, request: Request):
+async def login(payload: LoginRequest, request: Request, response: Response):
     database = _require_db()
     ip = _client_ip(request)
     email = str(payload.email).lower().strip()
@@ -299,8 +298,16 @@ async def login(payload: LoginRequest, request: Request):
     user_id = str(user["_id"])
     token = create_access_token(user_id, email)
     logger.info("Admin login success.")
+    response.set_cookie(
+        key="nsv_admin_session",
+        value=token,
+        max_age=60 * 60 * 12,
+        httponly=True,
+        secure=IS_PRODUCTION,
+        samesite="lax",
+        path="/",
+    )
     return LoginResponse(
-        token=token,
         user=AuthUser(
             id=user_id,
             email=user["email"],
@@ -309,6 +316,11 @@ async def login(payload: LoginRequest, request: Request):
         ),
     )
 
+
+@api_router.post("/auth/logout")
+async def logout(response: Response):
+    response.delete_cookie(key="nsv_admin_session", path="/")
+    return {"success": True}
 
 @api_router.get("/auth/me", response_model=AuthUser)
 async def me(current=Depends(get_current_user)):
@@ -391,6 +403,8 @@ def _cors_origins() -> list[str]:
     if configured:
         return [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
     return [
+        "https://www.newsaintveron.com.br",
+        "https://newsaintveron.com.br",
         "https://newsaintveron.vercel.app",
         "http://localhost:3000",
         "http://localhost:3001",
@@ -402,7 +416,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_origins=_cors_origins(),
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Content-Type"],
     max_age=600,
 )
 
