@@ -2,9 +2,6 @@ import { Section, Overline } from "@/components/common/Section";
 import { Reveal } from "@/components/common/Reveal";
 import { METHODOLOGY } from "@/data/content";
 
-const METHOD_IMG =
-  "https://images.unsplash.com/photo-1622396481322-3b83d186701b?crop=entropy&cs=srgb&fm=jpg&q=85&w=1200";
-
 export const Methodology = () => (
   <Section id="metodologia" className="bg-obsidian" data-testid="methodology-section">
     <div className="grid gap-14 lg:grid-cols-12">
@@ -19,12 +16,11 @@ export const Methodology = () => (
             </h2>
           </Reveal>
           <Reveal delay={0.1}>
-            <div className="mt-10 hidden overflow-hidden rounded-[4px] border border-white/[0.07] lg:block">
-              <img
-                src={METHOD_IMG}
-                alt="Arquitetura minimalista em tons escuros"
-                className="h-64 w-full object-cover opacity-40 grayscale"
-              />
+            <div className="mt-10 hidden lg:block">
+              <div className="h-px w-16 bg-champagne" />
+              <p className="mt-5 max-w-xs font-sans text-xs uppercase tracking-[0.22em] text-ivory-muted">
+                Estratégia · Design · Engenharia · Evolução
+              </p>
             </div>
           </Reveal>
         </div>
