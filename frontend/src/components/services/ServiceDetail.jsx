@@ -27,7 +27,7 @@ export const ServiceDetail = ({
             <div className="absolute left-8 top-8 h-24 w-24 border-l border-t border-champagne/40" />
             <div className="absolute bottom-8 right-8 h-24 w-24 border-b border-r border-champagne/40" />
             <div className="absolute bottom-8 left-8">
-              <span className="block font-serif text-6xl italic text-champagne/70">
+              <span className="numeric-display block text-5xl font-light text-champagne/70">
                 {index}
               </span>
               <span className="mt-2 block text-overline font-sans text-ivory-muted">
@@ -65,7 +65,7 @@ export const ServiceDetail = ({
         {capabilities.map((c, i) => (
           <Reveal key={c.title} delay={(i % 3) * 0.08}>
             <div className="group border-t border-white/[0.1] pt-6">
-              <span className="font-sans text-xs tracking-[0.3em] text-champagne/60">
+              <span className="numeric-display text-xs tracking-[0.18em] text-champagne/60">
                 {String(i + 1).padStart(2, "0")}
               </span>
               <h3 className="mt-5 font-serif text-2xl text-ivory">{c.title}</h3>
@@ -92,7 +92,7 @@ export const ServiceDetail = ({
           {approach.map((a, i) => (
             <Reveal key={a.title} delay={i * 0.06}>
               <div className="group flex gap-6 border-b border-white/[0.07] py-8 last:border-b-0">
-                <span className="font-serif text-3xl italic text-champagne/50 transition-colors group-hover:text-champagne">
+                <span className="numeric-display text-2xl font-light text-champagne/50 transition-colors group-hover:text-champagne">
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <div>
