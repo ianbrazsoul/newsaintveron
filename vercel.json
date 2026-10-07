@@ -53,6 +53,12 @@
       }
     },
     {
+      "source": "/favicon.svg",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
       "source": "/sitemap.xml",
       "destination": {
         "service": "frontend"
