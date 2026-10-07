@@ -16,7 +16,7 @@ export const PageHero = ({ overline, title, lines, subtitle, index }) => (
         className="flex items-center gap-4"
       >
         {index && (
-          <span className="font-serif text-lg italic text-champagne/70">{index}</span>
+          <span className="numeric-display text-sm tracking-[0.08em] text-champagne/70">{index}</span>
         )}
         <span className="text-overline font-sans font-medium text-champagne">
           {overline}
