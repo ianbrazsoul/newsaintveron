@@ -1,32 +1,21 @@
-import { useRef } from "react";
-import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, ArrowDown } from "lucide-react";
 import { HERO } from "@/data/content";
 import { MaskedHeading } from "@/components/common/MaskedHeading";
 import { Button } from "@/components/common/Button";
 
 const HERO_IMG =
-  "https://images.unsplash.com/photo-1707338252277-3f66895b0532?crop=entropy&cs=srgb&fm=jpg&q=80&w=1600";
+  "https://images.unsplash.com/photo-1707338252277-3f66895b0532?crop=entropy&cs=srgb&fm=webp&q=65&w=1440";
 
 export const Hero = () => {
-  const ref = useRef(null);
   const reduce = useReducedMotion();
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start start", "end start"],
-  });
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", reduce ? "0%" : "24%"]);
-  const scale = useTransform(scrollYProgress, [0, 1], [1, reduce ? 1 : 1.15]);
-  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
 
   return (
     <section
-      ref={ref}
       data-testid="hero-section"
       className="relative flex min-h-[100svh] items-end overflow-hidden bg-obsidian"
     >
-      {/* Parallax treated image */}
-      <motion.div style={{ y, scale }} className="absolute inset-0 z-0">
+      <div className="absolute inset-0 z-0">
         <img
           src={HERO_IMG}
           alt=""
@@ -34,18 +23,15 @@ export const Hero = () => {
           className="h-full w-full object-cover opacity-50"
           fetchPriority="high"
           decoding="async"
-          width="1600"
-          height="1122"
+          width="1440"
+          height="1010"
         />
-      </motion.div>
-      {/* Cinematic clip / spotlight overlays (solid, no muddy gradients on top of image only) */}
+      </div>
+
       <div className="absolute inset-0 z-[1] bg-gradient-to-t from-obsidian via-obsidian/70 to-obsidian/30" />
       <div className="absolute inset-0 z-[1] bg-[radial-gradient(circle_at_70%_30%,rgba(212,175,55,0.10),transparent_55%)]" />
 
-      <motion.div
-        style={{ opacity }}
-        className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-16 pt-32 md:px-10 md:pb-24"
-      >
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-16 pt-32 md:px-10 md:pb-24">
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -88,7 +74,7 @@ export const Hero = () => {
             </Button>
           </motion.div>
         </div>
-      </motion.div>
+      </div>
 
       {!reduce && (
         <motion.div
