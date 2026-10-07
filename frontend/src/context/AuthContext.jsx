@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { adminApi, getToken, setToken, clearToken, formatApiError } from "@/lib/adminApi";
+import { adminApi, formatApiError } from "@/lib/adminApi";
 
 const AuthContext = createContext(null);
 
@@ -7,30 +7,25 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   // null = checking, false = not authed, object = authed
-  const [user, setUser] = useState(getToken() ? null : false);
+  const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    let active = true;
-    if (!getToken()) {
-      setUser(false);
-      return;
-    }
+  const refreshSession = useCallback(() => {
     adminApi
       .get("/auth/me")
-      .then(({ data }) => active && setUser(data))
-      .catch(() => {
-        clearToken();
-        if (active) setUser(false);
-      });
-    return () => {
-      active = false;
-    };
+      .then(({ data }) => setUser(data))
+      .catch(() => setUser(false));
   }, []);
+
+  useEffect(() => {
+    refreshSession();
+    const onExpired = () => setUser(false);
+    window.addEventListener("nsv:auth-expired", onExpired);
+    return () => window.removeEventListener("nsv:auth-expired", onExpired);
+  }, [refreshSession]);
 
   const login = useCallback(async (email, password) => {
     try {
       const { data } = await adminApi.post("/auth/login", { email, password });
-      setToken(data.token);
       setUser(data.user);
       return { ok: true };
     } catch (e) {
@@ -38,9 +33,12 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const logout = useCallback(() => {
-    clearToken();
-    setUser(false);
+  const logout = useCallback(async () => {
+    try {
+      await adminApi.post("/auth/logout");
+    } finally {
+      setUser(false);
+    }
   }, []);
 
   return (
