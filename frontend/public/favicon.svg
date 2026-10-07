@@ -1,1 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="8" fill="#151515"/><text x="8" y="47" font-family="Georgia,serif" font-size="40" fill="#D8C49A" letter-spacing="-6">NS</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="NEW SAINT VÉRON">
+  <rect width="64" height="64" rx="10" fill="#0A0A0A"/>
+  <path d="M13 46V18h7l13 17V18h7v28h-7L20 29v17z" fill="#F3EFE6"/>
+  <path d="M43 18h8l-5 11h6L41 46h-8l6-12h-6z" fill="#D8C49A"/>
+</svg>
