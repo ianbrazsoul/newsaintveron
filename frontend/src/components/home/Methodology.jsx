@@ -31,7 +31,7 @@ export const Methodology = () => (
           {METHODOLOGY.steps.map((step, i) => (
             <Reveal key={step.n} delay={i * 0.06}>
               <div className="group flex gap-6 border-b border-white/[0.07] py-9 last:border-b-0 md:gap-10">
-                <span className="w-14 shrink-0 font-serif text-4xl italic text-champagne/50 transition-colors group-hover:text-champagne md:text-5xl">
+                <span className="numeric-display w-14 shrink-0 text-3xl font-light text-champagne/50 transition-colors group-hover:text-champagne md:text-4xl">
                   {step.n}
                 </span>
                 <div className="pt-1">
